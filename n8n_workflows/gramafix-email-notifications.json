@@ -1,0 +1,105 @@
+{
+  "name": "GramaFix Email Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "issue-update",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Issue Update",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "gramafix-issue-update"
+    },
+    {
+      "parameters": {
+        "functionCode": "const issueData = items[0].json.body;\n\n// Format status with emoji\nconst statusEmoji = {\n  'Received': '📥',\n  'In Progress': '⚙️',\n  'Resolved': '✅'\n};\n\nconst statusColor = {\n  'Received': '#f59e0b',\n  'In Progress': '#3b82f6',\n  'Resolved': '#10b981'\n};\n\nreturn [{\n  json: {\n    to: issueData.reporter_email,\n    subject: `${statusEmoji[issueData.status] || '🔔'} GramaFix: Issue #${issueData.issue_id.substring(0, 8)} - ${issueData.status}`,\n    html: `\n      <!DOCTYPE html>\n      <html>\n      <head>\n        <style>\n          body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f8fafc; }\n          .container { max-width: 600px; margin: 0 auto; background: white; }\n          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }\n          .content { padding: 30px; }\n          .issue-card { background: #f8fafc; border-left: 4px solid ${statusColor[issueData.status] || '#667eea'}; padding: 20px; border-radius: 8px; margin: 20px 0; }\n          .issue-card p { margin: 10px 0; color: #1e293b; }\n          .issue-card strong { color: #475569; }\n          .status-badge { display: inline-block; background: ${statusColor[issueData.status] || '#667eea'}; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; }\n          .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; margin-top: 20px; font-weight: bold; }\n          .footer { background: #f1f5f9; padding: 20px; text-align: center; color: #64748b; font-size: 14px; }\n        </style>\n      </head>\n      <body>\n        <div class=\"container\">\n          <div class=\"header\">\n            <h1 style=\"margin: 0; font-size: 28px;\">🌾 GramaFix</h1>\n            <p style=\"margin: 10px 0 0 0; opacity: 0.9;\">Issue Status Update</p>\n          </div>\n          <div class=\"content\">\n            <h2 style=\"color: #1e293b; margin-top: 0;\">Dear ${issueData.reporter_name},</h2>\n            <p style=\"color: #475569; font-size: 16px; line-height: 1.6;\">Your reported issue has been updated by the Gram Panchayat office.</p>\n            \n            <div class=\"issue-card\">\n              <p><strong>Issue ID:</strong> #${issueData.issue_id.substring(0, 8)}</p>\n              <p><strong>Category:</strong> ${issueData.category}</p>\n              <p><strong>Current Status:</strong> <span class=\"status-badge\">${statusEmoji[issueData.status] || '🔔'} ${issueData.status}</span></p>\n              <p><strong>Updated By:</strong> ${issueData.updated_by}</p>\n              ${issueData.remarks ? `<p><strong>Officer's Remarks:</strong> ${issueData.remarks}</p>` : ''}\n              <p><strong>Updated On:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>\n            </div>\n            \n            <p style=\"color: #475569; font-size: 15px; line-height: 1.6;\">\n              ${issueData.status === 'Resolved' \n                ? 'Thank you for reporting this issue. Your contribution helps make our village better! 🙏' \n                : 'We are working on resolving this issue. You will be notified of further updates.'}\n            </p>\n            \n            <center>\n              <a href=\"http://localhost:5173/issues\" class=\"button\">📋 View All Issues</a>\n            </center>\n          </div>\n          <div class=\"footer\">\n            <p style=\"margin: 5px 0;\"><strong>GramaFix</strong> - Smart Rural Issue Reporting</p>\n            <p style=\"margin: 5px 0; font-size: 12px;\">This is an automated notification. Please do not reply to this email.</p>\n          </div>\n        </div>\n      </body>\n      </html>\n    `\n  }\n}];"
+      },
+      "id": "format-email",
+      "name": "Format Email Content",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "send-gmail",
+      "name": "Send Email (Gmail)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [650, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "1",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Email sent successfully\" } }}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Issue Update": {
+      "main": [
+        [
+          {
+            "node": "Format Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email Content": {
+      "main": [
+        [
+          {
+            "node": "Send Email (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (Gmail)": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-13T16:00:00.000Z",
+  "versionId": "1"
+}
