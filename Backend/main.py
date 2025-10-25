@@ -25,6 +25,14 @@ load_dotenv()
 
 # Import notifications after env is loaded so it can read configuration
 # n8n notifications removed; no external notification hooks
+# Telegram Bot integration for free notifications
+from telegram_bot import (
+    send_telegram_message,
+    notify_issue_created,
+    notify_status_update,
+    get_telegram_bot_link,
+    verify_telegram_chat
+)
 
 # ---- App Setup ----
 app = FastAPI(title="GramaFix API", version="1.0.0")
@@ -750,6 +758,162 @@ async def get_categories():
     return {"categories": CATEGORIES}
 
 
+# ---- Telegram Integration Routes ----
+
+@app.get("/api/telegram/link")
+async def get_telegram_link(current_user = Depends(get_current_user)):
+    """Get Telegram bot deep link for user to connect"""
+    user_id = str(current_user["_id"])
+    telegram_link = get_telegram_bot_link(user_id)
+    
+    if not telegram_link:
+        raise HTTPException(
+            status_code=503,
+            detail="Telegram bot not configured. Please contact administrator."
+        )
+    
+    # Check if user already has Telegram connected
+    is_connected = bool(current_user.get("telegram_chat_id"))
+    
+    return {
+        "telegram_link": telegram_link,
+        "is_connected": is_connected,
+        "chat_id": current_user.get("telegram_chat_id")
+    }
+
+
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(update: dict):
+    """
+    Webhook endpoint for Telegram bot updates
+    
+    When a user clicks the deep link (t.me/YourBot?start=USER_ID),
+    Telegram sends an update here with /start command and the user_id parameter.
+    We store their chat_id in the database.
+    """
+    try:
+        # Extract message data
+        message = update.get("message", {})
+        chat = message.get("chat", {})
+        chat_id = str(chat.get("id", ""))
+        text = message.get("text", "")
+        
+        if not chat_id:
+            return {"status": "ignored"}
+        
+        # Handle /start command with user_id parameter
+        if text.startswith("/start "):
+            # Extract user_id from command
+            parts = text.split(" ", 1)
+            if len(parts) == 2:
+                user_id = parts[1].strip()
+                
+                # Update user's telegram_chat_id
+                try:
+                    result = await users_collection.update_one(
+                        {"_id": ObjectId(user_id)},
+                        {"$set": {
+                            "telegram_chat_id": chat_id,
+                            "telegram_connected_at": datetime.now()
+                        }}
+                    )
+                    
+                    if result.modified_count > 0:
+                        # Send welcome message
+                        welcome_msg = """
+🎉 <b>Successfully Connected!</b>
+
+Your GramaFix account is now linked to Telegram.
+
+You'll receive instant notifications when:
+• Your issues are reviewed
+• Status updates occur
+• Issues are resolved
+
+Thank you for using GramaFix! 🙏
+"""
+                        await send_telegram_message(chat_id, welcome_msg)
+                        
+                        return {"status": "success", "user_id": user_id}
+                    else:
+                        # User not found
+                        await send_telegram_message(
+                            chat_id,
+                            "❌ User not found. Please try reconnecting from the GramaFix website."
+                        )
+                        return {"status": "user_not_found"}
+                        
+                except Exception as e:
+                    print(f"Error updating telegram_chat_id: {e}")
+                    await send_telegram_message(
+                        chat_id,
+                        "❌ Connection failed. Please try again later."
+                    )
+                    return {"status": "error", "error": str(e)}
+        
+        # Handle /disconnect command
+        elif text.strip() == "/disconnect":
+            # Find user by chat_id and remove it
+            result = await users_collection.update_one(
+                {"telegram_chat_id": chat_id},
+                {"$unset": {"telegram_chat_id": "", "telegram_connected_at": ""}}
+            )
+            
+            if result.modified_count > 0:
+                await send_telegram_message(
+                    chat_id,
+                    "✅ Telegram disconnected successfully. You won't receive notifications anymore."
+                )
+            else:
+                await send_telegram_message(
+                    chat_id,
+                    "⚠️ No connected account found."
+                )
+            
+            return {"status": "disconnected"}
+        
+        # Default response
+        return {"status": "ok"}
+        
+    except Exception as e:
+        print(f"Telegram webhook error: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/api/telegram/disconnect")
+async def disconnect_telegram(current_user = Depends(get_current_user)):
+    """Disconnect user's Telegram account"""
+    try:
+        result = await users_collection.update_one(
+            {"_id": current_user["_id"]},
+            {"$unset": {"telegram_chat_id": "", "telegram_connected_at": ""}}
+        )
+        
+        if result.modified_count > 0:
+            return {"message": "Telegram disconnected successfully"}
+        else:
+            return {"message": "No Telegram connection found"}
+            
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error disconnecting Telegram: {str(e)}"
+        )
+
+
+@app.get("/api/telegram/status")
+async def get_telegram_status(current_user = Depends(get_current_user)):
+    """Check if user has Telegram connected"""
+    is_connected = bool(current_user.get("telegram_chat_id"))
+    connected_at = current_user.get("telegram_connected_at")
+    
+    return {
+        "is_connected": is_connected,
+        "connected_at": connected_at.isoformat() if isinstance(connected_at, datetime) else connected_at,
+        "chat_id": current_user.get("telegram_chat_id") if is_connected else None
+    }
+
+
 @app.post("/api/issues")
 async def create_issue(
     background_tasks: BackgroundTasks,
@@ -819,6 +983,25 @@ async def create_issue(
     #         )
     #     except Exception:
     #         pass
+    
+    # Telegram notification - FREE alternative to SMS
+    # Find user by phone and send notification if Telegram connected
+    try:
+        user = await users_collection.find_one({"phone": reporter_phone})
+        if user and user.get("telegram_chat_id"):
+            issue_data = {
+                "issue_id": str(result.inserted_id),
+                "category": category,
+                "description": description,
+                "gram_panchayat": gram_panchayat
+            }
+            background_tasks.add_task(
+                notify_issue_created,
+                user.get("telegram_chat_id"),
+                issue_data
+            )
+    except Exception as e:
+        print(f"Failed to send Telegram notification: {e}")
     
     return {
         "message": "Issue reported successfully",
@@ -969,6 +1152,45 @@ async def update_issue_status(
     #         )
     # except Exception:
     #     pass
+    
+    # Telegram notification - FREE alternative to SMS
+    # Find user by phone and send status update notification
+    if updated_issue:
+        try:
+            reporter_phone = updated_issue.get("reporter_phone")
+            user = await users_collection.find_one({"phone": reporter_phone})
+            if user and user.get("telegram_chat_id"):
+                # Get old status from the issue before it was updated (for comparison)
+                # Since we already updated, we'll infer from status_updates or just show new status
+                issue_data = {
+                    "issue_id": str(updated_issue["_id"]),
+                    "category": updated_issue.get("category"),
+                    "description": updated_issue.get("description", "")[:100],
+                    "gram_panchayat": updated_issue.get("gram_panchayat")
+                }
+                
+                # Try to get old status from status_updates or default to "Received"
+                old_status = "Received"
+                try:
+                    last_update = await status_updates_collection.find_one(
+                        {"issue_id": issue_id},
+                        sort=[("updated_at", -1)],
+                        skip=1  # Skip the current update
+                    )
+                    if last_update:
+                        old_status = last_update.get("status", "Received")
+                except:
+                    pass
+                
+                background_tasks.add_task(
+                    notify_status_update,
+                    user.get("telegram_chat_id"),
+                    issue_data,
+                    status,
+                    old_status
+                )
+        except Exception as e:
+            print(f"Failed to send Telegram notification: {e}")
     
     return {
         "message": "Status updated successfully",

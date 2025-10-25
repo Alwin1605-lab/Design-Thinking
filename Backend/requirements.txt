@@ -16,3 +16,4 @@ twilio>=9.0.0
 pyotp>=2.9.0
 cryptography>=42.0.0
 pydub>=0.25.1
+python-telegram-bot>=20.7

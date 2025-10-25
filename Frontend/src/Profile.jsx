@@ -52,8 +52,38 @@ export default function Profile() {
   const [totp, setTotp] = useState({ enabled: false });
   const [qr, setQr] = useState(null);
   const [totpCode, setTotpCode] = useState("");
+  const [telegram, setTelegram] = useState({ isConnected: false, loading: true });
+  
   useEffect(() => {
     if (user && user.totp) setTotp(user.totp);
+  }, [user]);
+
+  // Fetch Telegram connection status
+  useEffect(() => {
+    const fetchTelegramStatus = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+        
+        const res = await fetch("http://localhost:8000/api/telegram/status", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setTelegram({ ...data, loading: false });
+        } else {
+          setTelegram({ isConnected: false, loading: false });
+        }
+      } catch (e) {
+        console.error("Failed to fetch Telegram status:", e);
+        setTelegram({ isConnected: false, loading: false });
+      }
+    };
+    
+    if (user) {
+      fetchTelegramStatus();
+    }
   }, [user]);
 
   const startTotp = async () => {
@@ -90,6 +120,72 @@ export default function Profile() {
       alert("Authenticator enabled!");
     } catch (e) {
       alert(e.message || "Failed to verify code");
+    }
+  };
+
+  const connectTelegram = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://localhost:8000/api/telegram/link", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data?.detail || "Failed to get Telegram link");
+      }
+      
+      const data = await res.json();
+      
+      if (data.telegram_link) {
+        // Open Telegram deep link in new window
+        window.open(data.telegram_link, "_blank");
+        
+        // Show instructions
+        alert(
+          "📱 Opening Telegram...\n\n" +
+          "1. Click START in the bot chat\n" +
+          "2. Come back to this page\n" +
+          "3. You'll see 'Connected' status\n\n" +
+          "You'll receive instant notifications about your issues!"
+        );
+        
+        // Refresh status after a few seconds
+        setTimeout(async () => {
+          const statusRes = await fetch("http://localhost:8000/api/telegram/status", {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            setTelegram({ ...statusData, loading: false });
+          }
+        }, 5000);
+      }
+    } catch (e) {
+      alert(e.message || "Failed to connect Telegram");
+    }
+  };
+
+  const disconnectTelegram = async () => {
+    if (!confirm("Disconnect Telegram? You won't receive notifications anymore.")) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://localhost:8000/api/telegram/disconnect", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to disconnect");
+      }
+      
+      setTelegram({ isConnected: false, loading: false });
+      alert("Telegram disconnected successfully");
+    } catch (e) {
+      alert(e.message || "Failed to disconnect Telegram");
     }
   };
 
@@ -188,6 +284,67 @@ export default function Profile() {
                   <button onClick={verifyTotp} className="btn-primary">Verify & Enable</button>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+
+        <div className="profile-card" style={{ marginTop: 16 }}>
+          <h3>📱 Telegram Notifications</h3>
+          <p className="telegram-description">
+            Get instant, FREE notifications about your issues directly in Telegram!
+          </p>
+          
+          {telegram.loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+              <div className="spinner-small"></div>
+              <span>Checking connection...</span>
+            </div>
+          ) : telegram.isConnected ? (
+            <div className="telegram-connected">
+              <div className="telegram-status">
+                <span className="status-icon">✅</span>
+                <div>
+                  <strong>Connected</strong>
+                  {telegram.connected_at && (
+                    <div style={{ fontSize: '0.9em', color: '#666', marginTop: '4px' }}>
+                      Since {new Date(telegram.connected_at).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="telegram-info">
+                <strong>You'll receive notifications for:</strong>
+                <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
+                  <li>✉️ New issue confirmations</li>
+                  <li>🔄 Status updates (In Progress, Resolved)</li>
+                  <li>⚡ Priority updates</li>
+                </ul>
+              </div>
+              
+              <button onClick={disconnectTelegram} className="btn-secondary" style={{ marginTop: '12px' }}>
+                Disconnect Telegram
+              </button>
+            </div>
+          ) : (
+            <div className="telegram-disconnected">
+              <div className="telegram-info">
+                <strong>Why connect Telegram?</strong>
+                <ul style={{ marginTop: '8px', paddingLeft: '20px' }}>
+                  <li>📬 Instant push notifications</li>
+                  <li>💰 100% FREE forever</li>
+                  <li>🚀 No SMS costs</li>
+                  <li>📱 Works on any device</li>
+                </ul>
+              </div>
+              
+              <button onClick={connectTelegram} className="btn-primary" style={{ marginTop: '12px', width: '100%' }}>
+                🔗 Connect Telegram
+              </button>
+              
+              <p style={{ fontSize: '0.85em', color: '#666', marginTop: '8px', textAlign: 'center' }}>
+                Click above → Telegram opens → Click START → Done!
+              </p>
             </div>
           )}
         </div>
