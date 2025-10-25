@@ -1,0 +1,4 @@
+{
+  "note": "Firebase service account removed. This file was retained in the past but is no longer used.",
+  "action": "If you have a production Firebase service account here, remove it from the repo immediately and store it securely in your deployment environment."
+}

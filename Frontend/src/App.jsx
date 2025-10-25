@@ -9,6 +9,7 @@ import Login from "./Login";
 import Profile from "./Profile";
 import Header from "./Header";
 import "./App.css";
+import ChatbotWidget from "./ChatbotWidget.jsx";
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <footer className="app-footer">
           <p>GramaFix © 2025 - Smart Rural Issue Reporting</p>
         </footer>
+        <ChatbotWidget />
       </div>
     </Router>
   );

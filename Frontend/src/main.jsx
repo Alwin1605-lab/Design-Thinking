@@ -8,3 +8,12 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+// Push notifications are now user-initiated via a header toggle
+
+// Register app service worker only when explicitly enabled
+if (import.meta.env.VITE_ENABLE_APP_SW === 'true' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

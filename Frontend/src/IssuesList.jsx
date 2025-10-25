@@ -86,41 +86,58 @@ export default function IssuesList() {
 
   return (
     <div className="issues-list-container">
-      <h2>📋 All Reported Issues</h2>
+      <div className="page-header">
+        <div className="page-header-content">
+          <div className="page-header-icon">📋</div>
+          <div>
+            <h1 className="page-title">All Reported Issues</h1>
+            <p className="page-subtitle">Track and monitor community issues reported by citizens</p>
+          </div>
+        </div>
+      </div>
 
       <div className="filters">
-        <select
-          value={filter.status}
-          onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-          className="filter-select"
-        >
-          <option value="">All Statuses</option>
-          <option value="Received">Received</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Resolved">Resolved</option>
-        </select>
+        <div className="filter-group">
+          <label className="filter-label">Status</label>
+          <select
+            value={filter.status}
+            onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+            className="filter-select"
+          >
+            <option value="">All Statuses</option>
+            <option value="Received">📥 Received</option>
+            <option value="In Progress">⚙️ In Progress</option>
+            <option value="Resolved">✅ Resolved</option>
+          </select>
+        </div>
 
-        <select
-          value={filter.category}
-          onChange={(e) => setFilter({ ...filter, category: e.target.value })}
-          className="filter-select"
-        >
-          <option value="">All Categories</option>
-          <option value="Roads">🛣 Roads</option>
-          <option value="Water">💧 Water</option>
-          <option value="Electricity">💡 Electricity</option>
-          <option value="School">🏫 School</option>
-          <option value="Farming">🚜 Farming</option>
-          <option value="Sanitation">🗑 Sanitation</option>
-        </select>
+        <div className="filter-group">
+          <label className="filter-label">Category</label>
+          <select
+            value={filter.category}
+            onChange={(e) => setFilter({ ...filter, category: e.target.value })}
+            className="filter-select"
+          >
+            <option value="">All Categories</option>
+            <option value="Roads">🛣 Roads</option>
+            <option value="Water">💧 Water</option>
+            <option value="Electricity">💡 Electricity</option>
+            <option value="School">🏫 School</option>
+            <option value="Farming">🚜 Farming</option>
+            <option value="Sanitation">🗑 Sanitation</option>
+          </select>
+        </div>
 
-        <input
-          type="text"
-          placeholder="Filter by Gram Panchayat"
-          value={filter.gram_panchayat}
-          onChange={(e) => setFilter({ ...filter, gram_panchayat: e.target.value })}
-          className="filter-input"
-        />
+        <div className="filter-group">
+          <label className="filter-label">Gram Panchayat</label>
+          <input
+            type="text"
+            placeholder="Search by location..."
+            value={filter.gram_panchayat}
+            onChange={(e) => setFilter({ ...filter, gram_panchayat: e.target.value })}
+            className="filter-input"
+          />
+        </div>
 
         <button onClick={fetchIssues} className="refresh-btn">
           🔄 Refresh
@@ -128,10 +145,17 @@ export default function IssuesList() {
       </div>
 
       {loading ? (
-        <p>Loading issues...</p>
+        <div className="loading-container">
+          <div className="spinner-large"></div>
+          <p>Loading issues...</p>
+        </div>
       ) : (
         <>
-          <p className="issues-count">Showing {issues.length} issue(s)</p>
+          <div className="issues-stats">
+            <p className="issues-count">
+              <strong>{issues.length}</strong> issue(s) found
+            </p>
+          </div>
           <div className="issues-grid">
             {issues.map((issue) => (
               <div key={issue._id} className="issue-card">

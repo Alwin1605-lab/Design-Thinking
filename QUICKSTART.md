@@ -79,6 +79,37 @@ npm run dev
 
 ---
 
+## 🐳 Deploy with Docker (One Command)
+
+If you prefer containers, use the included docker-compose setup:
+
+1) Prepare env files
+
+- Backend: copy `.env.example` to `Backend/.env` and fill values (Mongo URI not required; compose sets it)
+- Frontend: copy `.env.example` to `Frontend/.env` and fill at least:
+   - `VITE_GOOGLE_MAPS_API_KEY`
+   - No Firebase configuration is needed (Firebase has been removed)
+
+2) Run
+
+```powershell
+cd d:\DT\Design-Thinking
+docker compose up --build -d
+```
+
+Services:
+- Frontend: http://localhost:5173
+- Backend: http://localhost:8000
+- MongoDB: mongodb://localhost:27017
+
+Stop:
+
+```powershell
+docker compose down
+```
+
+---
+
 ## 🎯 First Time Setup
 
 ### 1. Register a User
@@ -128,6 +159,39 @@ npm run dev
 
 ---
 
+## 🔐 Enable Authenticator (TOTP)
+
+1. Login and go to your Profile page
+2. Click "Enable Authenticator"
+3. Scan the QR in Google Authenticator or Authy
+4. Enter the 6-digit code to verify and enable TOTP
+5. From the Login page, you can now login using the "Authenticator (TOTP)" tab
+
+Backend environment options (optional, already sane defaults):
+
+```
+TOTP_ISSUER=GramaFix
+TOTP_INTERVAL=30
+TOTP_DIGITS=6
+TOTP_VALID_WINDOW=1
+TOTP_ENCRYPTION_KEY=<set a stable Fernet key for persistence>
+```
+
+To generate a Fernet key for TOTP_ENCRYPTION_KEY:
+
+```python
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+```
+
+---
+
+## 🤖 Chatbot (Groq LLM)
+
+If `GROQ_API_KEY` is set in Backend/.env, the Chatbot widget uses Groq to answer questions. Without a key, it replies with simple built-in messages.
+
+---
+
 ## 🎤 Testing Voice Transcription
 
 1. Go to http://localhost:5173/report
@@ -172,6 +236,21 @@ npm run dev
 
 ---
 
+## 🔔 Push Notifications
+
+Firebase/FCM has been removed per project direction. If you need SMS updates to reporters, you can optionally enable Twilio in Backend/.env:
+
+```
+ENABLE_TWILIO_SMS=true
+ENABLE_TWILIO_OTP=false
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_FROM_NUMBER=...
+```
+Leave these unset or `false` to disable SMS entirely.
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Backend won't start
@@ -179,6 +258,12 @@ npm run dev
 **Solution**: 
 ```bash
 pip install groq
+```
+
+**Error**: `ModuleNotFoundError: No module named 'dotenv'`
+**Solution**:
+```bash
+pip install python-dotenv
 ```
 
 **Error**: `Could not connect to MongoDB`

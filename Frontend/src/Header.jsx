@@ -2,8 +2,23 @@ import React from "react";
 import { Link } from "react-router-dom";
 
 function Header() {
-  const isLoggedIn = localStorage.getItem("loggedIn") === "true";
-  const user = isLoggedIn ? JSON.parse(localStorage.getItem("user") || "{}") : null;
+  // Be defensive: only treat as logged in if a parseable user exists
+  let user = null;
+  let isLoggedIn = false;
+  try {
+    const flag = localStorage.getItem("loggedIn") === "true";
+    const raw = localStorage.getItem("user");
+    if (flag && raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed._id || parsed.id)) {
+        user = parsed;
+        isLoggedIn = true;
+      }
+    }
+  } catch (e) {
+    isLoggedIn = false;
+    user = null;
+  }
 
   return (
     <header className="app-header">
@@ -34,7 +49,8 @@ function Header() {
         )}
       </nav>
 
-      <div className="header-profile">
+      <div className="header-profile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
         {isLoggedIn ? (
           <Link to="/profile" className="profile-icon">
             <div className="profile-avatar">
@@ -43,9 +59,14 @@ function Header() {
             <span className="profile-name">{user?.name || 'Profile'}</span>
           </Link>
         ) : (
-          <Link to="/login" className="login-btn">
-            🔐 Login
-          </Link>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Link to="/login" className="login-btn">
+              🔐 Login
+            </Link>
+            <Link to="/register" className="login-btn" style={{ background: '#4caf50' }}>
+              📝 Register
+            </Link>
+          </div>
         )}
       </div>
     </header>

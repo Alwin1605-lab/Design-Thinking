@@ -20,6 +20,7 @@
 - **Features**:
   - Registration with ID proof
   - Email/Password login
+  - App-based Authenticator (TOTP) setup and login
   - Role-based routing
   - Profile management
   - Secure localStorage tokens
@@ -36,48 +37,9 @@
 
 ---
 
-## 📧 n8n Email Automation - Ready to Use!
+## ✉️ Notifications
 
-### Setup Instructions
-
-#### 1. Install n8n
-```bash
-# Install globally
-npm install n8n -g
-
-# Start n8n
-n8n start
-```
-
-Access n8n at: **http://localhost:5678**
-
-#### 2. Import Workflow
-1. Open n8n (http://localhost:5678)
-2. Click "Workflows" → "Import from File"
-3. Select: `D:\Design Thinking\n8n_workflows\gramafix-email-notifications.json`
-4. Workflow will be imported with all nodes configured
-
-#### 3. Configure Gmail
-1. In n8n, click on "Gmail" node
-2. Click "Create New Credential"
-3. Select "OAuth2"
-4. Follow Google authentication flow
-5. Grant permissions to n8n
-
-#### 4. Activate Workflow
-1. Toggle workflow to "Active"
-2. Copy the webhook URL: `http://localhost:5678/webhook/issue-update`
-3. Note: Keep n8n running in background
-
-#### 5. Test Email System
-The backend already has the integration code ready. Just install httpx:
-
-```bash
-cd Backend
-pip install httpx
-```
-
-The webhook will be triggered automatically when issue status is updated!
+Per the latest project direction, Firebase Cloud Messaging and n8n email automations have been removed from the codebase. If you need reporter updates, you can optionally enable Twilio SMS in Backend/.env. Otherwise, notifications are disabled by default.
 
 ---
 
@@ -88,11 +50,6 @@ The webhook will be triggered automatically when issue status is updated!
 **Terminal 1: MongoDB**
 ```bash
 mongod --dbpath="C:\data\db"
-```
-
-**Terminal 2: n8n (NEW!)**
-```bash
-n8n start
 ```
 
 **Terminal 3: Backend**
@@ -110,7 +67,6 @@ npm run dev
 ### Access Points
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
-- **n8n Dashboard**: http://localhost:5678
 - **API Docs**: http://localhost:8000/docs
 
 ---
@@ -144,11 +100,11 @@ npm run dev
 3. ✅ Update issue status
 4. ✅ View analytics
 
-### Test 5: Email Notifications (with n8n)
-1. ✅ Start n8n and activate workflow
-2. ✅ Update issue status as admin
-3. ✅ Check email inbox for notification
-4. ✅ Verify email formatting
+### Test 5: Chatbot
+1. ✅ Ensure `GROQ_API_KEY` is set in Backend/.env
+2. ✅ Open the chatbot widget (bottom-right) on any page
+3. ✅ Ask how to report an issue or how to enable Authenticator
+4. ✅ Verify a helpful response
 
 ---
 
@@ -165,9 +121,12 @@ npm run dev
 ✅ python-dotenv==1.0.0
 ✅ Pillow==10.1.0
 ✅ groq>=0.30.0 (Whisper API)
-✅ httpx>=0.27.0 (n8n webhooks)
+✅ httpx>=0.27.0
 ✅ qrcode[pil]>=7.4.2 (future feature)
 ✅ python-jose[cryptography]>=3.3.0 (JWT tokens)
+✅ pyotp>=2.9.0 (TOTP)
+✅ cryptography>=42.0.0 (Fernet for TOTP secret encryption)
+✅ twilio>=9.0.0 (optional, SMS)
 ```
 
 ### Frontend
@@ -185,7 +144,7 @@ npm run dev
 ```
 D:\Design Thinking\
 ├── Backend/
-│   ├── main.py              ✅ API with Groq Whisper & auth
+│   ├── main.py              ✅ API with Groq Whisper, TOTP & chatbot
 │   ├── models.py            ✅ Data models
 │   ├── requirements.txt     ✅ Updated with new packages
 │   ├── .env                 ✅ Groq API key configured
@@ -206,8 +165,8 @@ D:\Design Thinking\
 │   │   └── index.css        ✅ Complete styling
 │   └── package.json
 │
-├── n8n_workflows/
-│   └── gramafix-email-notifications.json ✅ Ready-to-import workflow
+├── n8n_workflows/ (legacy)
+│   └── gramafix-email-notifications.json ❌ Deprecated (kept for reference)
 │
 ├── ENHANCEMENT_SUGGESTIONS.md  ✅ 50+ feature ideas
 ├── FEATURES_GUIDE.md           ✅ Setup guides (SMS, Maps, etc.)
@@ -227,7 +186,7 @@ D:\Design Thinking\
 - 👍 Vote to prioritize issues
 - 📊 Track issue status
 - 👤 Personal profile with statistics
-- 📧 Email notifications (via n8n)
+- � Chatbot assistance
 
 ### For Officers/Admins
 - 📊 Analytics dashboard
@@ -243,8 +202,8 @@ D:\Design Thinking\
 
 ### Immediate (Today)
 1. ✅ **Test voice transcription** - Already working!
-2. 🔄 **Setup n8n email** - Workflow ready, just import
-3. 🔄 **Install httpx** - For n8n webhook integration
+2. � **Enable Authenticator (TOTP)** - Go to your Profile, click "Enable Authenticator", scan the QR in Google Authenticator/Authy and verify the 6-digit code.
+3. 🤖 **Add GROQ_API_KEY** - Put your Groq API key in `Backend/.env` to enable the chatbot and Whisper transcription.
 
 ### This Week
 1. 📱 **WhatsApp integration** - More practical than email for rural India
@@ -271,11 +230,10 @@ D:\Design Thinking\
 - Use headphones with mic for best results
 - Groq Whisper works in 90+ languages!
 
-### n8n Email Automation
-- Keep n8n running in background
-- Use Gmail OAuth2 (more reliable than SMTP)
-- Test webhook URL before production
-- Check n8n execution logs for debugging
+### Authenticator (TOTP)
+- Set a stable TOTP_ENCRYPTION_KEY in Backend/.env for persistence across restarts
+- Use Google Authenticator or Authy to scan the QR
+- Store recovery codes out of band (future enhancement)
 
 ### Performance Optimization
 - Compress images before upload
@@ -323,7 +281,7 @@ D:\Design Thinking\
 ### Documentation
 - ✅ 5 comprehensive guides
 - ✅ 50+ feature suggestions
-- ✅ n8n workflow template
+- n8n workflow template (legacy)
 - ✅ Code examples & tutorials
 
 ---
@@ -335,7 +293,7 @@ You've successfully built a project with:
 - ✅ **AI integration** (Groq Whisper)
 - ✅ **Database design** (MongoDB)
 - ✅ **Authentication** (Role-based)
-- ✅ **Automation** (n8n workflows)
+- ✅ **Chatbot** (Groq LLM)
 - ✅ **REST API design**
 - ✅ **Modern UI/UX**
 
@@ -353,7 +311,7 @@ Perfect for:
 1. 🎤 **AI Voice Input** - Groq Whisper (90+ languages)
 2. 🌍 **Rural Focus** - Solves real village problems
 3. 📱 **Offline-first** (with planned features)
-4. 🤖 **Automation** - n8n for email workflows
+4. 🤖 **Chatbot** - Groq LLM powered assistant
 5. 👥 **Community Driven** - Voting & priorities
 6. 📊 **Transparency** - Public dashboards
 
@@ -364,15 +322,14 @@ Perfect for:
 ### Current (Free Tier)
 - Groq API: **FREE** (14,400 requests/day)
 - MongoDB: **FREE** (self-hosted)
-- n8n: **FREE** (self-hosted)
 - Frontend/Backend: **FREE** (localhost)
 - **Total: $0/month** 🎉
 
 ### Production (Deployed)
 - Server (DigitalOcean): **$6/month**
 - Domain (.in): **$1/month**
-- WhatsApp (Twilio): **~$5/month** (1000 msgs)
-- **Total: ~$12/month** 💰
+- WhatsApp/SMS (Twilio): Optional, costs vary
+- **Total: ~$7–12+/month** 💰
 
 ### Scalability
 - Can handle 500+ villages
@@ -390,14 +347,14 @@ You've built a production-ready, AI-powered civic engagement platform! 🚀
 ✅ Full-stack web application
 ✅ AI-powered voice transcription
 ✅ Role-based authentication
-✅ Email automation ready (n8n)
+✅ TOTP-based 2FA and passwordless login
 ✅ Comprehensive documentation
 ✅ Competition-ready project
 
 ### Next Steps
-1. Import n8n workflow
-2. Test email notifications
-3. Add WhatsApp integration
+1. Set TOTP_ENCRYPTION_KEY in Backend/.env
+2. Add GROQ_API_KEY for the chatbot and Whisper
+3. Optionally enable Twilio SMS in Backend/.env
 4. Deploy to production
 5. Submit to hackathons!
 
@@ -406,7 +363,6 @@ You've built a production-ready, AI-powered civic engagement platform! 🚀
 ## 📞 Support & Resources
 
 - **Groq Console**: https://console.groq.com/
-- **n8n Docs**: https://docs.n8n.io/
 - **FastAPI Docs**: https://fastapi.tiangolo.com/
 - **React Docs**: https://react.dev/
 

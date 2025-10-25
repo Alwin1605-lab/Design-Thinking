@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from "react";
+import MapView from "./MapView";
 
 export default function AdminDashboard() {
   const [issues, setIssues] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedIssue, setSelectedIssue] = useState(null);
+  const [gpFilter, setGpFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [statusForm, setStatusForm] = useState({
     status: "",
     remarks: "",
     updated_by: "",
+    assigned_department: "",
   });
+  const [progressFiles, setProgressFiles] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -18,9 +24,15 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
+      const q = new URLSearchParams();
+      q.set("limit", "50");
+      if (gpFilter) q.set("gram_panchayat", gpFilter);
+      if (startDate) q.set("start_date", startDate);
+      if (endDate) q.set("end_date", endDate);
+      const qp = `?${q.toString()}`;
       const [issuesRes, statsRes] = await Promise.all([
-        fetch("http://localhost:8000/api/issues?limit=50"),
-        fetch("http://localhost:8000/api/analytics"),
+        fetch(`http://localhost:8000/api/issues${qp}`),
+        fetch(`http://localhost:8000/api/analytics${gpFilter || startDate || endDate ? `?${new URLSearchParams({ ...(gpFilter?{gram_panchayat:gpFilter}:{}) , ...(startDate?{start_date:startDate}:{}) , ...(endDate?{end_date:endDate}:{}) }).toString()}` : ""}`),
       ]);
 
       const issuesData = await issuesRes.json();
@@ -35,6 +47,29 @@ export default function AdminDashboard() {
     }
   };
 
+  const exportCsv = async () => {
+    const params = new URLSearchParams();
+    if (gpFilter) params.set("gram_panchayat", gpFilter);
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`http://localhost:8000/api/admin/export/issues.csv?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "issues.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Export failed", e);
+      alert("Failed to export CSV (are you logged in as admin/officer?)");
+    }
+  };
+
   const handleStatusUpdate = async (e) => {
     e.preventDefault();
 
@@ -44,20 +79,31 @@ export default function AdminDashboard() {
     formData.append("status", statusForm.status);
     formData.append("remarks", statusForm.remarks);
     formData.append("updated_by", statusForm.updated_by);
+    if (statusForm.assigned_department) {
+      formData.append("assigned_department", statusForm.assigned_department);
+    }
+    if (progressFiles && progressFiles.length) {
+      for (const f of progressFiles) {
+        formData.append("progress_images", f);
+      }
+    }
 
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `http://localhost:8000/api/issues/${selectedIssue._id}/status`,
         {
           method: "PUT",
           body: formData,
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       if (response.ok) {
         alert("Status updated successfully!");
         setSelectedIssue(null);
-        setStatusForm({ status: "", remarks: "", updated_by: "" });
+        setStatusForm({ status: "", remarks: "", updated_by: "", assigned_department: "" });
+        setProgressFiles([]);
         fetchDashboardData();
       } else {
         alert("Failed to update status");
@@ -89,6 +135,20 @@ export default function AdminDashboard() {
     <div className="admin-dashboard">
       <h2>⚙️ Admin Dashboard - Gram Panchayat</h2>
 
+      <div className="toolbar" style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
+        <input
+          type="text"
+          value={gpFilter}
+          onChange={(e) => setGpFilter(e.target.value)}
+          placeholder="Filter by Gram Panchayat (optional)"
+          style={{ padding: 8, minWidth: 280 }}
+        />
+        <input type="date" value={startDate} onChange={(e)=>setStartDate(e.target.value)} />
+        <input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} />
+        <button onClick={fetchDashboardData} className="btn btn-secondary">Apply Filter</button>
+        <button onClick={exportCsv} className="btn btn-primary">⬇️ Export CSV</button>
+      </div>
+
       {stats && (
         <div className="dashboard-stats">
           <div className="stat-card">
@@ -116,11 +176,18 @@ export default function AdminDashboard() {
           <div className="stat-card">
             <h3>Resolution Rate</h3>
             <div className="stat-number">{stats.resolution_rate}%</div>
+            <div className="progress-bar" style={{ marginTop: 6 }}>
+              <div className="progress-fill" style={{ width: `${stats.resolution_rate}%` }} />
+            </div>
           </div>
         </div>
       )}
 
       <div className="dashboard-content">
+        <div className="map-panel">
+          <h3>Issues Map</h3>
+          <MapView issues={issues} />
+        </div>
         <div className="issues-panel">
           <h3>Recent Issues</h3>
           <div className="issues-table">
@@ -194,6 +261,20 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
+            {stats.trend && stats.trend.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <h4>Trend (daily)</h4>
+                <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 60 }}>
+                  {(() => {
+                    const max = Math.max(...stats.trend.map((t) => t.count));
+                    return stats.trend.map((t) => (
+                      <div key={t.date} title={`${t.date}: ${t.count}`}
+                           style={{ width: 8, background: "#2196f3", height: `${max? (t.count / max) * 100 : 0}%` }} />
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -258,6 +339,21 @@ export default function AdminDashboard() {
                   placeholder="Officer name"
                   required
                 />
+              </div>
+
+              <div className="form-group">
+                <label>Assigned Department</label>
+                <input
+                  type="text"
+                  value={statusForm.assigned_department}
+                  onChange={(e) => setStatusForm({ ...statusForm, assigned_department: e.target.value })}
+                  placeholder="e.g., Public Works Department"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Progress Images</label>
+                <input type="file" multiple accept="image/*" onChange={(e) => setProgressFiles(Array.from(e.target.files || []))} />
               </div>
 
               <div className="modal-actions">
